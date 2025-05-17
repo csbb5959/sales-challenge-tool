@@ -1,0 +1,45 @@
+# .gitignore für das Email-Projekt
+
+# Python-Cache und Bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints/
+
+# VSCode & IDE Settings
+.vscode/
+.idea/
+
+# api emails
+api_emails.py
+
+# Umgebungsvariablen & Secrets
+*.env
+.env
+*.env.*
+!*.env.example
+
+# Google Service Account JSON & andere Schlüsseldateien
+*.json
+!requirements.txt
+
+# Logfiles
+*.log
+mail_log/
+logs/
+
+# Google Sheets/Excel/Exports
+*.xlsx
+*.xls
+*.csv
+
+# Sonstiges
+.DS_Store
+*.bak
+*.swp
+*.tmp
+
+# pytest & Test-Cache
+.pytest_cache/
