@@ -40,6 +40,26 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
+SIGNATURE_HTML = """
+<br><br>
+<span style="color:#888; font-size:13px;">
+  <b style="color:#888; font-size:15px;">Lucas Freigang</b><br>
+  <span style="font-size:11px;">Head of ESG</span><br>
+  <a href="https://icons.at" style="color:#1a73e8; text-decoration:none; font-size:14px;">icons – consulting by students Innsbruck</a><br>
+  <br>
+  <span style="color:#888;">Bürgerstraße 2 | 6020 Innsbruck | Österreich</span><br><br>
+  <span>
+    +436607197960 | <a href="mailto:lucas.freigang@icons.at" style="color:#888;">lucas.freigang@icons.at</a> | <a href="https://icons.at" style="color:#888;">icons.at</a>
+  </span>
+  <br>
+  <hr style="border:0; border-top:1px solid #ccc;">
+  <span style="font-size:10px;">Vereinsbehörde: LPD Tirol | ZVR-Zahl: 542695411</span><br>
+  <span style="font-size:9px; color:gray;">
+    This e-mail message may contain confidential and/or privileged information. If you are not an addressee or otherwise authorized to receive this message, you should not use, copy, disclose or take any action based on this e-mail or any information contained in the message. If you have received this material in error, please advise the sender immediately by reply e-mail and delete this message. Thank you.
+  </span>
+</span>
+"""
+
 def get_prompt(prompt_type=None, custom_prompt=None):
     if custom_prompt:
         return custom_prompt

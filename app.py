@@ -179,6 +179,9 @@ else:
     custom_mail_subject = None
     custom_mail_text = None
 
+# Auswahl für E-Mail-Signatur
+add_signature = st.checkbox("E-Mail-Signatur anhängen (empfohlen)", value=True)
+
 # Optionaler Anhang per Drag & Drop
 uploaded_file = st.file_uploader("Optional: Anhang (z.B. PDF) per Drag & Drop hinzufügen", type=["pdf"])
 
@@ -200,7 +203,8 @@ if not filtered_df.empty:
                     row['Unternehmen'],
                     mail_text=custom_mail_text if mail_text_option == "Eigenen Text eingeben" else None,
                     mail_subject=custom_mail_subject if mail_text_option == "Eigenen Text eingeben" else None,
-                    attachment=uploaded_file
+                    attachment=uploaded_file,
+                    add_signature=add_signature
                 )
                 st.success(f"Mail gesendet an {row['E-Mail']}")
                 time.sleep(DELAY_SECONDS)

@@ -66,9 +66,29 @@ DEFAULT_MAIL_HTML = """
     <p>Falls wir Ihre Aufmerksamkeit geweckt haben, würde ich Ihnen gerne ein unverbindliches Gespräch anbieten, auf dessen Basis wir ein maßgeschneidertes, kostenloses Proposal für Sie ausarbeiten werden.</p>
     <p>Wir sind gespannt auf Ihre Antwort.</p>
     <p>Mit bestem Dank und freundlichen Grüßen</p>
-    <p>Lucas Freigang<br>icons – consulting by students</p>
+    <p>Lucas Freigang</p>
   </body>
 </html>
+"""
+
+SIGNATURE_HTML = """
+<br><br>
+<span style="color:#888; font-size:13px;">
+  <b style="color:#888; font-size:15px;">Lucas Freigang</b><br>
+  <span style="font-size:11px;">Head of ESG</span><br>
+  <a href="https://icons.at" style="color:#1a73e8; text-decoration:none; font-size:14px;">icons – consulting by students Innsbruck</a><br>
+  <br>
+  <span>Bürgerstraße 2 | 6020 Innsbruck | Österreich</span><br><br>
+  <span>
+    +436607197960 | <a href="mailto:lucas.freigang@icons.at" style="color:#888;">lucas.freigang@icons.at</a> | <a href="https://icons.at" style="color:#888;">icons.at</a>
+  </span>
+  <br>
+  <hr style="border:0; border-top:1px solid #ccc;">
+  <span style="font-size:10px;">Vereinsbehörde: LPD Tirol | ZVR-Zahl: 542695411</span><br>
+  <span style="font-size:9px; color:gray;">
+    This e-mail message may contain confidential and/or privileged information. If you are not an addressee or otherwise authorized to receive this message, you should not use, copy, disclose or take any action based on this e-mail or any information contained in the message. If you have received this material in error, please advise the sender immediately by reply e-mail and delete this message. Thank you.
+  </span>
+</span>
 """
 
 def convert_text_to_html(text, company):
@@ -78,7 +98,11 @@ def convert_text_to_html(text, company):
     html_paragraphs = [f"<p>{line.strip()}</p>" for line in paragraphs if line.strip()]
     return "<html><body>" + "\n".join(html_paragraphs) + "</body></html>"
 
-def send_mail(recipient, company, mail_text=None, mail_subject=None, attachment=None):
+def add_signature_to_html(html, signature):
+    import re
+    return re.sub(r"</body\s*>", signature + "</body>", html, flags=re.IGNORECASE)
+
+def send_mail(recipient, company, mail_text=None, mail_subject=None, attachment=None, add_signature=True):
     try:
         msg = MIMEMultipart()
         msg['From'] = td['GMAIL_USER']
@@ -91,6 +115,10 @@ def send_mail(recipient, company, mail_text=None, mail_subject=None, attachment=
             html = convert_text_to_html(mail_text, company)
         else:
             html = DEFAULT_MAIL_HTML.format(company=company)
+
+        # Signatur optional anhängen
+        if add_signature:
+            html = add_signature_to_html(html, SIGNATURE_HTML)
 
         msg.attach(MIMEText(html, 'html'))
 
