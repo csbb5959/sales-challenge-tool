@@ -6,6 +6,25 @@ import os
 import gspread
 from google.oauth2.service_account import Credentials
 
+# Passwortschutz (ganz am Anfang der Datei einfügen)
+def check_password():
+    def password_entered():
+        if st.session_state["password"] == st.secrets["APP_PASSWORD"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Passwort aus dem Speicher löschen
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        st.text_input("Passwort", type="password", on_change=password_entered, key="password")
+        st.stop()
+    elif not st.session_state["password_correct"]:
+        st.text_input("Passwort", type="password", on_change=password_entered, key="password")
+        st.error("Falsches Passwort")
+        st.stop()
+
+check_password()
+
 # Neue Importe für get_companies und send_emails:
 from get_companies import get_companies_via_openai_prompt, parse_openai_response, update_sheet, get_prompt
 from send_emails import send_mail, df, td, DELAY_SECONDS, LOG_FILE
