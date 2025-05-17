@@ -5,9 +5,8 @@ import pandas as pd
 import smtplib
 import time
 import logging
-import os
+import streamlit as st
 from email.mime.multipart import MIMEMultipart
-from dotenv import load_dotenv
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
@@ -15,28 +14,29 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 # --- Konfiguration ---
-SHEET_JSON = 'sales-challenge-600f686a3b9b.json'  # JSON-Datei für Google Sheets API
-SPREADSHEET_ID = "1ghB0Okyu3MEQizb2qyIPTTIlr29eF6ljJoQOvJM4PME"  # ID des Google Sheets
-WORKSHEET_NAME = "Kontaktliste all"  # Name des Arbeitsblatts
-PDF_PATH = 'resources/icons-Flyer.pdf'  # Pfad zur PDF-Datei, die angehängt wird
-LOG_FILE = 'mail_log/mail_log.txt'  # Log-Datei für Erfolge und Fehler
+SPREADSHEET_ID = "1ghB0Okyu3MEQizb2qyIPTTIlr29eF6ljJoQOvJM4PME"
+WORKSHEET_NAME = "Kontaktliste all"
+LOG_FILE = 'mail_log/mail_log.txt'
 DELAY_SECONDS = 3  # Wartezeit zwischen den Mails (anpassbar)
 
-load_dotenv()  # .env-Datei laden
-
+# Gmail-Zugangsdaten aus st.secrets laden
 td = {
-    'GMAIL_USER': os.getenv('GMAIL_USER'),
-    'GMAIL_PASS': os.getenv('GMAIL_PASS'),
-    'SMTP_HOST': os.getenv('SMTP_HOST'),
-    'SMTP_PORT': int(os.getenv('SMTP_PORT', 587))
+    'GMAIL_USER': st.secrets["GMAIL_USER"],
+    'GMAIL_PASS': st.secrets["GMAIL_PASS"],
+    'SMTP_HOST': st.secrets.get("SMTP_HOST", "smtp.gmail.com"),
+    'SMTP_PORT': int(st.secrets.get("SMTP_PORT", 587))
 }
 
-# --- Google Sheets Setup ---
+# Google Sheets Setup (Streamlit Cloud: Service Account aus st.secrets)
+SERVICE_ACCOUNT_FILE = "service_account.json"
+with open(SERVICE_ACCOUNT_FILE, "w") as f:
+    f.write(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"])
+
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
-CREDS = Credentials.from_service_account_file(SHEET_JSON, scopes=SCOPES)
+CREDS = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 gc = gspread.authorize(CREDS)
 sh = gc.open_by_key(SPREADSHEET_ID)
 worksheet = sh.worksheet(WORKSHEET_NAME)
@@ -75,7 +75,6 @@ def convert_text_to_html(text, company):
     html_paragraphs = [f"<p>{line.strip()}</p>" for line in paragraphs if line.strip()]
     return "<html><body>" + "\n".join(html_paragraphs) + "</body></html>"
 
-# Funktion zum Versenden einer einzelnen Mail
 def send_mail(recipient, company, mail_text=None, mail_subject=None, attachment=None):
     try:
         msg = MIMEMultipart()

@@ -15,7 +15,15 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
-CREDS = Credentials.from_service_account_file("sales-challenge-600f686a3b9b.json", scopes=SCOPES)
+
+# Schreibe die JSON-Datei aus dem Secret
+SERVICE_ACCOUNT_FILE = "service_account.json"
+with open(SERVICE_ACCOUNT_FILE, "w") as f:
+    f.write(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"])
+
+# Dann verwende SERVICE_ACCOUNT_FILE für Credentials:
+CREDS = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+
 SHEET_JSON = 'sales-challenge-600f686a3b9b.json'
 SPREADSHEET_ID = "1ghB0Okyu3MEQizb2qyIPTTIlr29eF6ljJoQOvJM4PME"
 WORKSHEET_NAME = "Kontaktliste all"
@@ -34,7 +42,7 @@ def save_company_data(df):
 st.title("Unternehmensakquise & Mailing Tool")
 
 # OpenAI-Key laden
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 # 1) Unternehmen suchen
 st.header("1. Unternehmen suchen (OpenAI)")

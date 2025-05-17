@@ -43,3 +43,8 @@ logs/
 
 # pytest & Test-Cache
 .pytest_cache/
+
+#secrets
+.streamlit/
+
+confidential/

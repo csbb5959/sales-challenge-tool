@@ -3,33 +3,28 @@ import pandas as pd
 import logging
 from openai import OpenAI
 import re
-import os
-from dotenv import load_dotenv
+import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 
 # --- Konfiguration ---
-SHEET_JSON = 'sales-challenge-600f686a3b9b.json'
 SPREADSHEET_ID = "1ghB0Okyu3MEQizb2qyIPTTIlr29eF6ljJoQOvJM4PME"
 WORKSHEET_NAME = "Kontaktliste all"
 LOG_FILE = 'mail_log/mail_log.txt'
 
-load_dotenv()
-ai_api_key = os.getenv('OPENAI_API_KEY')
+# OpenAI-Client initialisieren (Streamlit Cloud: Key aus st.secrets)
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# OpenAI-Client initialisieren
-try:
-    client = OpenAI(api_key=ai_api_key)
-except Exception as e:
-    print(f"Fehler beim Initialisieren des OpenAI-Clients: {e}")
-    exit(1)
+# Google Sheets Setup (Streamlit Cloud: Service Account aus st.secrets)
+SERVICE_ACCOUNT_FILE = "service_account.json"
+with open(SERVICE_ACCOUNT_FILE, "w") as f:
+    f.write(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"])
 
-# Google Sheets Setup
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
-CREDS = Credentials.from_service_account_file(SHEET_JSON, scopes=SCOPES)
+CREDS = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 gc = gspread.authorize(CREDS)
 sh = gc.open_by_key(SPREADSHEET_ID)
 worksheet = sh.worksheet(WORKSHEET_NAME)
@@ -117,21 +112,4 @@ def update_sheet(companies):
         print(f"{new_count} Unternehmen hinzugefügt.")
     else:
         print("Keine neuen Unternehmen hinzugefügt.")
-
-# --- Hauptablauf (optional) ---
-if __name__ == '__main__':
-    try:
-        prompt = get_prompt(prompt_type="mittelständisch")
-        response_text = get_companies_via_openai_prompt(prompt)
-        print("Antwort von OpenAI erhalten. Verarbeite...")
-        print(response_text)
-        companies = parse_openai_response(response_text)
-        print(companies)
-        if not companies:
-            print("❌ Keine Unternehmen aus der Antwort geparst.")
-            exit(1)
-        update_sheet(companies)
-    except Exception as e:
-        print(f"❌ Kritischer Fehler: {e}")
-        logging.error(f"Kritischer Fehler: {e}")
 
