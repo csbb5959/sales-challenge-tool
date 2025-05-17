@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import pandas as pd
 import logging
+import os
 from openai import OpenAI
 import re
 import streamlit as st
