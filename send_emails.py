@@ -13,6 +13,8 @@ from email import encoders
 import gspread
 from google.oauth2.service_account import Credentials
 
+os.makedirs("mail_log", exist_ok=True)
+
 # --- Konfiguration ---
 SPREADSHEET_ID = "1ghB0Okyu3MEQizb2qyIPTTIlr29eF6ljJoQOvJM4PME"
 WORKSHEET_NAME = "Kontaktliste all"
