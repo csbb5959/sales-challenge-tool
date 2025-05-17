@@ -16,6 +16,9 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
+# Ordner für Logfile anlegen, falls nicht vorhanden
+os.makedirs("mail_log", exist_ok=True)
+
 # Schreibe die JSON-Datei aus dem Secret
 SERVICE_ACCOUNT_FILE = "service_account.json"
 with open(SERVICE_ACCOUNT_FILE, "w") as f:
