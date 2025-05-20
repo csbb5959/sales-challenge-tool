@@ -4,6 +4,6 @@ befinden. Sobald ein Unternehmen keine Aussicht auf Erholung von schweren
 Umsatzeinbrüchen hat, darf das Unternehmen NICHT von dir aufgelistet werden.
 Format der Ergebnisdarstellung
 Bitte gib pro Unternehmen folgende Angaben an genau folgende Angaben an (nicht mehr und nicht weniger, kein bold, keine formatierung etc.):
-Unternehmensname - Website - Standort – Email Adresse
+Unternehmensname - Website - Standort - Email Adresse
 Die Email Adresse soll die offizielle Kontakt-Mail-Adresse sein (z.B. von der Website, Impressum etc.)
 (Beispiel: Beispiel Technik GmbH - www.beispiel-technik.de - Rosenheim, Bayern - info@technik.at)
