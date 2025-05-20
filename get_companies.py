@@ -81,19 +81,17 @@ def get_companies_via_openai_prompt(prompt):
 
 def parse_openai_response(response_text):
     companies = []
-    pattern = re.compile(
-        r'^\s*(.*?)\s*-\s*(.*?)\s*-\s*(.*?)\s*-\s*([\w\.-]+@[\w\.-]+\.\w+)\s*$'
-    )
+    # Splitte an Gedankenstrich (–, U+2013)
     lines = response_text.strip().split('\n')
     for line in lines:
-        match = pattern.match(line)
-        if match:
-            name, website, region, email = match.groups()
+        parts = [p.strip() for p in line.split(' – ')]
+        if len(parts) == 4:
+            name, website, region, email = parts
             companies.append({
-                'Name': name.strip(),
-                'Website': website.strip(),
-                'Region': region.strip(),
-                'E-Mail': email.strip()
+                'Name': name,
+                'Website': website,
+                'Region': region,
+                'E-Mail': email
             })
     return companies
 
@@ -133,4 +131,6 @@ def update_sheet(companies):
         print(f"{new_count} Unternehmen hinzugefügt.")
     else:
         print("Keine neuen Unternehmen hinzugefügt.")
+
+
 
