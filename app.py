@@ -53,6 +53,7 @@ gc = gspread.authorize(CREDS)
 sh = gc.open_by_key(SPREADSHEET_ID)
 worksheet = sh.worksheet(WORKSHEET_NAME)
 
+# Caching der Google Sheets-Daten
 @st.cache_data(ttl=60)
 def load_company_data():
     data = worksheet.get_all_records()
