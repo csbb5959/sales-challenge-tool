@@ -81,10 +81,8 @@ def get_companies_via_openai_prompt(prompt):
 
 def parse_openai_response(response_text):
     companies = []
-    # Akzeptiere Bindestrich, Gedankenstrich, verschiedene Leerzeichen als Trenner
     pattern = re.compile(
-        r'^\s*(.*?)\s*[-]\s*([^\s]+?\.[^\s]+?)\s*[-]\s*(.*?)\s*[-]\s*([\w\.-]+@[\w\.-]+\.\w+)\s*$',
-        re.IGNORECASE
+        r'^\s*(.*?)\s*-\s*(.*?)\s*-\s*(.*?)\s*-\s*([\w\.-]+@[\w\.-]+\.\w+)\s*$'
     )
     lines = response_text.strip().split('\n')
     for line in lines:
