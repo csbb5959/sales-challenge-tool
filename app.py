@@ -53,6 +53,7 @@ gc = gspread.authorize(CREDS)
 sh = gc.open_by_key(SPREADSHEET_ID)
 worksheet = sh.worksheet(WORKSHEET_NAME)
 
+@st.cache_data(ttl=60)
 def load_company_data():
     data = worksheet.get_all_records()
     return pd.DataFrame(data)
@@ -135,7 +136,11 @@ st.caption(
     "💡 **Tipp:** Wenn du mit der Maus über die Tabelle fährst, erscheint oben rechts eine kleine Suchlupe. "
     "Damit kannst du in jeder Spalte direkt nach Text filtern!"
 )
-df = load_company_data()
+try:
+    df = load_company_data()
+except Exception as e:
+    st.error("Google Sheets API-Limit erreicht. Bitte warte eine Minute und lade die Seite neu.")
+    st.stop()
 
 # Zeilen ohne Unternehmensnamen entfernen
 df = df[df["Unternehmen"].notna() & (df["Unternehmen"].str.strip() != "")]
