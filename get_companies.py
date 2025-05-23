@@ -84,17 +84,17 @@ def get_companies_via_openai_prompt(prompt):
 
 def parse_openai_response(response_text):
     companies = []
-    import re
     pattern = re.compile(
-    r'^\s*(.*?)\s*[-]\s*(.*?)\s*[-]\s*(.*?)\s*[-]\s*([\w\.-]+@[\w\.-]+\.\w+)\s*$'
+        r'^\s*(.*?)\s*[-–]\s*(.*?)\s*[-–]\s*(.*?)\s*[-–]\s*([\w\.-]+@[\w\.-]+\.\w+)\s*$'
     )
     lines = response_text.strip().split('\n')
     for line in lines:
         match = pattern.match(line)
         if match:
-            name, website, region, email = match.groups()
+            company_name, website, region, email = match.groups()
             companies.append({
-                'Name': name.strip(),
+                'Unternehmen': company_name.strip(),
+                'Name': company_name.strip(),  # für interne Verarbeitung
                 'Website': website.strip(),
                 'Region': region.strip(),
                 'E-Mail': email.strip()
@@ -110,33 +110,29 @@ def load_company_data():
     return df
 
 def update_sheet(companies):
-    """
-    Fügt neue Unternehmen als Zeilen in das Google Sheet ein.
-    Die Werte werden direkt aus dem company-Dict übernommen.
-    Gibt eine Liste der übersprungenen Unternehmensnamen zurück.
-    """
     existing_names = set(row['Unternehmen'] for row in worksheet.get_all_records())
     new_count = 0
     skipped_names = []
     for company in companies:
-        name = company.get('Name', '').strip()
+        company_name = company.get('Name', '').strip()  # <-- "Name" im Dict, "Unternehmen" im Sheet!
         email = company.get('E-Mail', '').strip()
         region = company.get('Region', '').strip()
         website = company.get('Website', '').strip()
         gruppe = company.get('Gruppe', '').strip()
         mitglied = company.get('Name icons Mitglied', '').strip()
         letzter_kontakt_orga = company.get('Letzter Kontakt Organisation', '').strip()
-        # Passe die Reihenfolge und Anzahl der Felder an dein Sheet an!
-        if not name or name in existing_names:
-            skipped_names.append(name)
+        name = company.get('Name', '').strip()  # Kontaktperson, Spalte I
+        last_contact_person = company.get('Letzter Kontakt Person', '').strip()
+        if not company_name or company_name in existing_names:
+            skipped_names.append(company_name)
             continue
         new_row = [
-            gruppe, region, mitglied, name, email,
-            '', '', '', '', '', '', letzter_kontakt_orga, '', 'Nein', ''
+            gruppe, region, mitglied, company_name, email,
+            '', '', '', name, '', last_contact_person, letzter_kontakt_orga, '', 'Nein', ''
         ] + [''] * 4 + [website]
         worksheet.append_row(new_row)
         new_count += 1
-        existing_names.add(name)
+        existing_names.add(company_name)
     if new_count > 0:
         print(f"{new_count} Unternehmen hinzugefügt.")
     else:

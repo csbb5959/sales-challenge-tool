@@ -101,19 +101,28 @@ elif prompt_option == "Kleine Unternehmen":
 if 'companies' not in st.session_state:
     st.session_state['companies'] = []
 
+search_contacts = st.checkbox("Auch nach Kontaktpersonen in HubSpot suchen | Achtung: Das dauert lange, es sollten nicht mehr als 3 Unternehmen damit gesucht werden!", value=False)
 if st.button("Unternehmen suchen"):
     if prompt:
         response_text = get_companies_via_openai_prompt(prompt)
         companies = parse_openai_response(response_text)
 
-        # Immer HubSpot-Unternehmensdaten übernehmen
         for company in companies:
-            hub_result = get_last_company_activity(company["Name"])
-            if hub_result and hub_result["name"]:
-                company["Name"] = hub_result["name"]  # Name überschreiben
-            company["Letzter Kontakt Organisation"] = hub_result["last_activity_date"] if hub_result else "Keinen Kontakt gefunden"
+            # Organisation immer suchen
+            hub_org = get_last_company_activity(company["Name"])
+            company["Letzter Kontakt Organisation"] = hub_org["last_activity_date"] if hub_org else "Keinen Kontakt gefunden"
 
-        # Speichere die Unternehmen im Session State, damit der "Eintragen"-Button erscheint!
+            if search_contacts:
+                hub_contact = get_last_hubspot_contact(email=company["E-Mail"], company_name=company["Name"])
+                if hub_contact:
+                    company["Name Kontaktperson"] = hub_contact.get("name", company["Name"])  # Spalte I
+                    company["E-Mail"] = hub_contact.get("email", company["E-Mail"])
+                    company["Letzter Kontakt Person"] = hub_contact.get("date", "")
+                else:
+                    company["Letzter Kontakt Person"] = "Keine Kontaktperson gefunden"
+            else:
+                company["Letzter Kontakt Person"] = ""
+
         st.session_state['companies'] = companies
 
         import pandas as pd
