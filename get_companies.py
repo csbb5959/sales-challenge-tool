@@ -114,9 +114,11 @@ def update_sheet(companies):
     """
     Fügt neue Unternehmen als Zeilen in das Google Sheet ein.
     Die Werte werden direkt aus dem company-Dict übernommen.
+    Gibt eine Liste der übersprungenen Unternehmensnamen zurück.
     """
     existing_names = set(row['Unternehmen'] for row in worksheet.get_all_records())
     new_count = 0
+    skipped_names = []
     for company in companies:
         name = company.get('Name', '').strip()
         email = company.get('E-Mail', '').strip()
@@ -124,10 +126,10 @@ def update_sheet(companies):
         website = company.get('Website', '').strip()
         gruppe = company.get('Gruppe', '').strip()
         mitglied = company.get('Name icons Mitglied', '').strip()
-        # NEU: Hole Wert für Spalte L ("Letzter Kontakt Organisation")
         letzter_kontakt_orga = company.get('Letzter Kontakt Organisation', '').strip()
         # Passe die Reihenfolge und Anzahl der Felder an dein Sheet an!
         if not name or name in existing_names:
+            skipped_names.append(name)
             continue
         new_row = [
             gruppe, region, mitglied, name, email,
@@ -140,6 +142,7 @@ def update_sheet(companies):
         print(f"{new_count} Unternehmen hinzugefügt.")
     else:
         print("Keine neuen Unternehmen hinzugefügt.")
+    return skipped_names
 
 # --- Testaufruf für die Kommandozeile ---
 if __name__ == "__main__":

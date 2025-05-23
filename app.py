@@ -139,23 +139,28 @@ if st.button("Unternehmen suchen"):
         st.warning("Bitte gib einen Prompt ein.")
 
 if st.session_state['companies']:
-    gruppe = st.text_input("Gruppe (optional)")
-    region = st.text_input("Region (optional)")
-    mitglied = st.text_input("Name icons Mitglied (optional)")
-    # Füge weitere optionale Felder nach Bedarf hinzu
-
-    if st.button("Gefundene Unternehmen in Tabelle eintragen"):
-        companies_to_add = []
-        for company in st.session_state['companies']:
-            company = company.copy()
-            if gruppe:
-                company['Gruppe'] = gruppe
-            if mitglied:
-                company['Name icons Mitglied'] = mitglied
-            companies_to_add.append(company)
-        update_sheet(companies_to_add)
-        st.success("Unternehmen wurden in Tabelle eingetragen.")
-        st.session_state['companies'] = []
+    with st.form("unternehmen_eintragen_form"):
+        gruppe = st.text_input("Gruppe (optional)")
+        region = st.text_input("Region (optional)")
+        mitglied = st.text_input("Name icons Mitglied (optional)")
+        submit = st.form_submit_button("Gefundene Unternehmen in Tabelle eintragen")
+        if submit:
+            companies_to_add = []
+            for company in st.session_state['companies']:
+                company = company.copy()
+                if gruppe:
+                    company['Gruppe'] = gruppe
+                if region:
+                    company['Region'] = region
+                if mitglied:
+                    company['Name icons Mitglied'] = mitglied
+                companies_to_add.append(company)
+            skipped = update_sheet(companies_to_add)
+            if skipped:
+                st.info(f"Folgende Unternehmen waren bereits im Google Sheet und wurden nicht erneut hinzugefügt:\n\n- " + "\n- ".join(skipped))
+            else:
+                st.success("Alle Unternehmen wurden in die Tabelle eingetragen.")
+            st.session_state['companies'] = []
 
 # 2) Excel-Liste anzeigen und filtern
 st.header("2. Tabelle anzeigen & filtern")
