@@ -128,7 +128,7 @@ if st.button("Unternehmen suchen"):
                 return 'background-color: lightgreen'
 
         if not companies_df.empty:
-            styled_df = companies_df.style.applymap(
+            styled_df = companies_df.style.map(
                 highlight_last_contact, subset=["Letzter Kontakt Organisation"]
             )
             st.write("Gefundene Unternehmen:")
