@@ -28,6 +28,7 @@ check_password()
 # Neue Importe für get_companies und send_emails:
 from get_companies import get_companies_via_openai_prompt, parse_openai_response, update_sheet, get_prompt
 from send_emails import send_mail, df, td, DELAY_SECONDS, LOG_FILE
+from hubspot_api import annotate_companies_with_hubspot, get_last_company_activity, get_last_hubspot_contact
 
 # Google Sheets Setup
 SCOPES = [
@@ -104,21 +105,46 @@ if st.button("Unternehmen suchen"):
     if prompt:
         response_text = get_companies_via_openai_prompt(prompt)
         companies = parse_openai_response(response_text)
+
+        # Immer HubSpot-Unternehmensdaten übernehmen
+        for company in companies:
+            hub_result = get_last_company_activity(company["Name"])
+            if hub_result and hub_result["name"]:
+                company["Name"] = hub_result["name"]  # Name überschreiben
+            company["Letzter Kontakt Organisation"] = hub_result["last_activity_date"] if hub_result else "Keinen Kontakt gefunden"
+
+        # Speichere die Unternehmen im Session State, damit der "Eintragen"-Button erscheint!
         st.session_state['companies'] = companies
-        st.write("Gefundene Unternehmen:")
-        st.write(companies)
+
+        import pandas as pd
+
+        # In DataFrame umwandeln für farbige Anzeige
+        companies_df = pd.DataFrame(companies)
+
+        def highlight_last_contact(val):
+            if val and val != "Keinen Kontakt gefunden":
+                return 'background-color: orange'
+            else:
+                return 'background-color: lightgreen'
+
+        if not companies_df.empty:
+            styled_df = companies_df.style.applymap(
+                highlight_last_contact, subset=["Letzter Kontakt Organisation"]
+            )
+            st.write("Gefundene Unternehmen:")
+            st.dataframe(styled_df, use_container_width=True)
+        else:
+            st.write("Keine Unternehmen gefunden.")
     else:
         st.warning("Bitte gib einen Prompt ein.")
 
 if st.session_state['companies']:
-    with st.expander("Optionale Zusatzinfos für neue Unternehmen"):
-        gruppe = st.text_input("Gruppe (optional)")
-        region = st.text_input("Region (optional)")
-        mitglied = st.text_input("Name icons Mitglied (optional)")
-        # Füge weitere optionale Felder nach Bedarf hinzu
+    gruppe = st.text_input("Gruppe (optional)")
+    region = st.text_input("Region (optional)")
+    mitglied = st.text_input("Name icons Mitglied (optional)")
+    # Füge weitere optionale Felder nach Bedarf hinzu
 
     if st.button("Gefundene Unternehmen in Tabelle eintragen"):
-        # Übernehme optionale Felder, falls sie gesetzt sind
         companies_to_add = []
         for company in st.session_state['companies']:
             company = company.copy()

@@ -7,6 +7,9 @@ import re
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
+import requests
+from datetime import datetime
+from hubspot_api import get_last_hubspot_contact, annotate_companies_with_hubspot, get_last_company_activity
 
 os.makedirs("mail_log", exist_ok=True)
 
@@ -81,17 +84,21 @@ def get_companies_via_openai_prompt(prompt):
 
 def parse_openai_response(response_text):
     companies = []
-    # Splitte an Gedankenstrich (–, U+2013)
+    # Splitte an Gedankenstrich (–, U+2013) oder Bindestrich (-)
+    import re
+    pattern = re.compile(
+        r'^\s*(.*?)\s*[-–]\s*(.*?)\s*[-–]\s*(.*?)\s*[-–]\s*([\w\.-]+@[\w\.-]+\.\w+)\s*$'
+    )
     lines = response_text.strip().split('\n')
     for line in lines:
-        parts = [p.strip() for p in line.split(' – ')]
-        if len(parts) == 4:
-            name, website, region, email = parts
+        match = pattern.match(line)
+        if match:
+            name, website, region, email = match.groups()
             companies.append({
-                'Name': name,
-                'Website': website,
-                'Region': region,
-                'E-Mail': email
+                'Name': name.strip(),
+                'Website': website.strip(),
+                'Region': region.strip(),
+                'E-Mail': email.strip()
             })
     return companies
 
@@ -117,13 +124,15 @@ def update_sheet(companies):
         website = company.get('Website', '').strip()
         gruppe = company.get('Gruppe', '').strip()
         mitglied = company.get('Name icons Mitglied', '').strip()
+        # NEU: Hole Wert für Spalte L ("Letzter Kontakt Organisation")
+        letzter_kontakt_orga = company.get('Letzter Kontakt Organisation', '').strip()
         # Passe die Reihenfolge und Anzahl der Felder an dein Sheet an!
         if not name or name in existing_names:
             continue
         new_row = [
             gruppe, region, mitglied, name, email,
-            '', '', '', '', '', '', '', '', 'Nein'
-        ] + [''] * 5 + [website]
+            '', '', '', '', '', '', letzter_kontakt_orga, '', 'Nein', ''
+        ] + [''] * 4 + [website]
         worksheet.append_row(new_row)
         new_count += 1
         existing_names.add(name)
@@ -131,6 +140,17 @@ def update_sheet(companies):
         print(f"{new_count} Unternehmen hinzugefügt.")
     else:
         print("Keine neuen Unternehmen hinzugefügt.")
+
+# --- Testaufruf für die Kommandozeile ---
+if __name__ == "__main__":
+    firmen = ["Deloitte Österreich", "PwC Österreich"]
+    for name in firmen:
+        print(f"\nSuche nach Unternehmen: {name}")
+        last_activity = get_last_company_activity(name)
+        if last_activity:
+            print(f"Letzte Aktivität für '{name}': {last_activity}")
+        else:
+            print(f"Kein Kontakt für '{name}' gefunden.")
 
 
 
