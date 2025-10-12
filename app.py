@@ -102,12 +102,13 @@ if 'companies' not in st.session_state:
     st.session_state['companies'] = []
 
 search_contacts = st.checkbox("Auch nach Kontaktpersonen in HubSpot suchen", value=False)
+only_new_hubspot = st.checkbox("Nur Unternehmen suchen, die nicht bereits in HubSpot sind")
 st.caption(
     "⚠️ **Achtung:** Dieses Feature sucht nach konkreten Personen in HubSpot, welche das gesuchte Unternehmen in ihrer E-Mail Adresse enthalten. "
     "Es wird automatisch die Kontaktperson mit der neuesten Aktivität gewählt. Dies ist jedoch sehr rechenintensiv. "
     "Daher sollte diese Checkbox nur mit einer Suche von maximal 3 Unternehmen ausgewählt werden!"
 )
-if st.button("Unternehmen suchen"):
+if st.button("Unternehmen suchen (normal)"):
     if prompt:
         response_text = get_companies_via_openai_prompt(prompt)
         companies = parse_openai_response(response_text)

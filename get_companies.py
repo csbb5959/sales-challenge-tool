@@ -139,6 +139,51 @@ def update_sheet(companies):
         print("Keine neuen Unternehmen hinzugefügt.")
     return skipped_names
 
+def get_unique_companies_via_openai_prompt(prompt, anzahl, max_iterations=5):
+    """
+    Holt genau 'anzahl' neue Unternehmen, die noch nicht in HubSpot sind.
+    Bricht nach max_iterations ab, falls nicht genügend neue Unternehmen gefunden werden.
+    """
+    all_companies = []
+    already_checked = set()
+    forbidden_names = set()
+    iteration = 0
+
+    while len(all_companies) < anzahl and iteration < max_iterations:
+        # Passe Prompt an, um bereits gefundene Unternehmen auszuschließen
+        forbidden_text = ""
+        if forbidden_names:
+            forbidden_text = (
+                "\nWICHTIG: Nenne KEINES der folgenden Unternehmen erneut, auch nicht in abgewandelter Schreibweise:\n"
+                + "\n".join(forbidden_names)
+            )
+        prompt = prompt.replace("{anzahl}", str(anzahl - len(all_companies))) + forbidden_text
+
+        response_text = get_companies_via_openai_prompt(prompt)
+        companies = parse_openai_response(response_text)
+
+        # Prüfe für jedes Unternehmen, ob es schon in HubSpot ist
+        new_this_round = []
+        for company in companies:
+            name = company.get("Name", "")
+            if name in already_checked:
+                continue
+            already_checked.add(name)
+            hub_contact = get_last_hubspot_contact(email=company.get("E-Mail", ""), company_name=name)
+            if not hub_contact:
+                new_this_round.append(company)
+            else:
+                forbidden_names.add(name)
+        all_companies.extend(new_this_round)
+        iteration += 1
+
+        if not new_this_round:
+            # Wenn keine neuen Unternehmen gefunden wurden, brich ab
+            break
+
+    # Gib nur die gewünschte Anzahl zurück
+    return all_companies[:anzahl]
+
 # --- Testaufruf für die Kommandozeile ---
 if __name__ == "__main__":
     firmen = ["Deloitte Österreich", "PwC Österreich"]
