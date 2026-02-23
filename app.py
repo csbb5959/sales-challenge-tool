@@ -6,12 +6,12 @@ import os
 import gspread
 from google.oauth2.service_account import Credentials
 
-# Passwortschutz (ganz am Anfang der Datei einfügen)
+# Passwortschutz
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["APP_PASSWORD"]:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Passwort aus dem Speicher löschen
+            del st.session_state["password"]
         else:
             st.session_state["password_correct"] = False
 
@@ -25,9 +25,9 @@ def check_password():
 
 check_password()
 
-# Neue Importe für get_companies und send_emails:
 from get_companies import get_companies_via_openai_prompt, parse_openai_response, update_sheet, get_prompt
-from send_emails import send_mail, df, td, DELAY_SECONDS, LOG_FILE
+# ACHTUNG: df hier aus dem Import entfernt, da app.py seine eigene Tabelle lädt
+from send_emails import send_mail, td, DELAY_SECONDS, LOG_FILE
 from hubspot_api import annotate_companies_with_hubspot, get_last_company_activity, get_last_hubspot_contact
 
 # Google Sheets Setup
@@ -36,40 +36,70 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-# Ordner für Logfile anlegen, falls nicht vorhanden
 os.makedirs("mail_log", exist_ok=True)
 
-# Schreibe die JSON-Datei aus dem Secret
 SERVICE_ACCOUNT_FILE = "service_account.json"
 with open(SERVICE_ACCOUNT_FILE, "w") as f:
     f.write(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"])
 
-# Dann verwende SERVICE_ACCOUNT_FILE für Credentials:
 CREDS = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-
-SHEET_JSON = 'sales-challenge-600f686a3b9b.json'
-SPREADSHEET_ID = "1ghB0Okyu3MEQizb2qyIPTTIlr29eF6ljJoQOvJM4PME"
-WORKSHEET_NAME = "Kontaktliste all"
+SPREADSHEET_ID = "1o4vY8j2hrHyKfs1wwvyxYF172BOvgPRl5qpj_9-GsJE"
+WORKSHEET_NAME = "Team Gabriel" 
 gc = gspread.authorize(CREDS)
 sh = gc.open_by_key(SPREADSHEET_ID)
 worksheet = sh.worksheet(WORKSHEET_NAME)
 
-# Caching der Google Sheets-Daten
 @st.cache_data(ttl=60)
 def load_company_data():
-    data = worksheet.get_all_records()
-    return pd.DataFrame(data)
+    # HIER IST DER FIX: Wir starten exakt bei Zeile 6
+    data = worksheet.get("A6:Q")
+    
+    if not data:
+        return pd.DataFrame()
+        
+    headers = data[0]
+    rows = data[1:]
+    
+    seen = {}
+    clean_headers = []
+    for i, h in enumerate(headers):
+        h = str(h).replace('\n', ' ').strip()
+        h = " ".join(h.split())
+        
+        if not h:
+            h = f"Leer_{i}"
+        if h in seen:
+            seen[h] += 1
+            clean_headers.append(f"{h}_{seen[h]}")
+        else:
+            seen[h] = 0
+            clean_headers.append(h)
+            
+    max_cols = len(clean_headers)
+    padded_rows = []
+    for row in rows:
+        padded_row = row + [''] * (max_cols - len(row))
+        padded_rows.append(padded_row[:max_cols])
+            
+    df = pd.DataFrame(padded_rows, columns=clean_headers)
+    
+    for col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors='ignore')
+        
+    return df
 
 def save_company_data(df):
-    worksheet.clear()
-    worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+    # WICHTIG: Wir löschen NICHT mehr das ganze Sheet, sondern nur den Tabellenbereich ab Zeile 6!
+    # "A6:Q1000" löscht großzügig nach unten, ohne deine Statistiken oben zu berühren.
+    worksheet.batch_clear(["A6:Q1000"]) 
+    
+    # Die neuen Daten ab Zelle A6 einfügen
+    data_to_upload = [df.columns.values.tolist()] + df.values.tolist()
+    worksheet.update(range_name="A6", values=data_to_upload)
 
 st.title("Unternehmensakquise & Mailing Tool")
-
-# OpenAI-Key laden
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# 1) Unternehmen suchen
 st.header("1. Unternehmen suchen (OpenAI)")
 
 prompt_option = st.radio(
@@ -77,7 +107,6 @@ prompt_option = st.radio(
     ("Eigener Prompt", "Mittelständische Unternehmen", "Kleine Unternehmen")
 )
 
-# Nur bei vorgefertigten Prompts die Anzahl anzeigen
 if prompt_option in ("Mittelständische Unternehmen", "Kleine Unternehmen"):
     anzahl = st.number_input(
         "Wie viele Unternehmen sollen recherchiert werden?",
@@ -103,25 +132,21 @@ if 'companies' not in st.session_state:
 
 search_contacts = st.checkbox("Auch nach Kontaktpersonen in HubSpot suchen", value=False)
 only_new_hubspot = st.checkbox("Nur Unternehmen suchen, die nicht bereits in HubSpot sind")
-st.caption(
-    "⚠️ **Achtung:** Dieses Feature sucht nach konkreten Personen in HubSpot, welche das gesuchte Unternehmen in ihrer E-Mail Adresse enthalten. "
-    "Es wird automatisch die Kontaktperson mit der neuesten Aktivität gewählt. Dies ist jedoch sehr rechenintensiv. "
-    "Daher sollte diese Checkbox nur mit einer Suche von maximal 3 Unternehmen ausgewählt werden!"
-)
+st.caption("⚠️ **Achtung:** Dieses Feature sucht nach konkreten Personen in HubSpot...")
+
 if st.button("Unternehmen suchen (normal)"):
     if prompt:
         response_text = get_companies_via_openai_prompt(prompt)
         companies = parse_openai_response(response_text)
 
         for company in companies:
-            # Organisation immer suchen
             hub_org = get_last_company_activity(company["Name"])
             company["Letzter Kontakt Organisation"] = hub_org["last_activity_date"] if hub_org else "Keinen Kontakt gefunden"
 
             if search_contacts:
                 hub_contact = get_last_hubspot_contact(email=company["E-Mail"], company_name=company["Name"])
                 if hub_contact:
-                    company["Name Kontaktperson"] = hub_contact.get("name", company["Name"])  # Spalte I
+                    company["Name Kontaktperson"] = hub_contact.get("name", company["Name"])
                     company["E-Mail"] = hub_contact.get("email", company["E-Mail"])
                     company["Letzter Kontakt Person"] = hub_contact.get("date", "")
                 else:
@@ -131,9 +156,6 @@ if st.button("Unternehmen suchen (normal)"):
 
         st.session_state['companies'] = companies
 
-        import pandas as pd
-
-        # In DataFrame umwandeln für farbige Anzeige
         companies_df = pd.DataFrame(companies)
 
         def highlight_last_contact(val):
@@ -163,55 +185,46 @@ if st.session_state['companies']:
             companies_to_add = []
             for company in st.session_state['companies']:
                 company = company.copy()
-                if gruppe:
-                    company['Gruppe'] = gruppe
-                if region:
-                    company['Region'] = region
-                if mitglied:
-                    company['Name icons Mitglied'] = mitglied
+                if gruppe: company['Gruppe'] = gruppe
+                if region: company['Region'] = region
+                if mitglied: company['Name icons Mitglied'] = mitglied
                 companies_to_add.append(company)
             skipped = update_sheet(companies_to_add)
             if skipped:
-                st.info(f"Folgende Unternehmen waren bereits im Google Sheet und wurden nicht erneut hinzugefügt:\n\n- " + "\n- ".join(skipped))
+                st.info(f"Folgende Unternehmen waren bereits im Google Sheet und wurden übersprungen:\n\n- " + "\n- ".join(skipped))
             else:
                 st.success("Alle Unternehmen wurden in die Tabelle eingetragen.")
             st.session_state['companies'] = []
 
-# 2) Excel-Liste anzeigen und filtern
 st.header("2. Tabelle anzeigen & filtern")
-st.caption(
-    "💡 **Tipp:** Wenn du mit der Maus über die Tabelle fährst, erscheint oben rechts eine kleine Suchlupe. "
-    "Damit kannst du in jeder Spalte direkt nach Text filtern!"
-)
+st.caption("💡 **Tipp:** Wenn du mit der Maus über die Tabelle fährst, erscheint oben rechts eine kleine Suchlupe.")
+
 try:
     df = load_company_data()
 except Exception as e:
-    st.error("Google Sheets API-Limit erreicht. Bitte warte eine Minute und lade die Seite neu.")
+    st.error(f"{type(e).__name__} - {e}")
     st.stop()
 
-# Zeilen ohne Unternehmensnamen entfernen
-df = df[df["Unternehmen"].notna() & (df["Unternehmen"].str.strip() != "")]
+# ANGEPASST: Nutzt nun "Unternehmensname (laut Handelsregister)"
+df = df[df["Unternehmensname (laut Handelsregister)"].notna() & (df["Unternehmensname (laut Handelsregister)"].str.strip() != "")]
 
-# Freitext-Filter für bestimmte Spalten
-mitglied_filter = st.text_input("Filter für 'Name icons Mitglied':")
-unternehmen_filter = st.text_input("Filter für 'Unternehmen':")
-region_filter = st.text_input("Filter für 'Region':")
+# ANGEPASST: Filter auf existierende Spalten geändert
+unternehmen_filter = st.text_input("Filter für 'Unternehmensname':")
+name_filter = st.text_input("Filter für 'Name, Nachname':")
+email_filter = st.text_input("Filter für 'E-Mail':")
 
-# Multiselect für weitere Spalten
-other_cols = [col for col in df.columns if col not in ["Name icons Mitglied", "Unternehmen", "Region"]]
+other_cols = [col for col in df.columns if col not in ["Unternehmensname (laut Handelsregister)", "Name, Nachname", "E-Mail"]]
 filter_cols = st.multiselect("Weitere Spalten zum Filtern auswählen:", other_cols)
 
 filtered_df = df.copy()
 
-# Anwenden der Freitext-Filter (case-insensitive, enthält)
-if mitglied_filter:
-    filtered_df = filtered_df[filtered_df["Name icons Mitglied"].str.contains(mitglied_filter, case=False, na=False)]
 if unternehmen_filter:
-    filtered_df = filtered_df[filtered_df["Unternehmen"].str.contains(unternehmen_filter, case=False, na=False)]
-if region_filter:
-    filtered_df = filtered_df[filtered_df["Region"].str.contains(region_filter, case=False, na=False)]
+    filtered_df = filtered_df[filtered_df["Unternehmensname (laut Handelsregister)"].str.contains(unternehmen_filter, case=False, na=False)]
+if name_filter:
+    filtered_df = filtered_df[filtered_df["Name, Nachname"].str.contains(name_filter, case=False, na=False)]
+if email_filter:
+    filtered_df = filtered_df[filtered_df["E-Mail"].str.contains(email_filter, case=False, na=False)]
 
-# Anwenden der Multiselect-Filter für andere Spalten
 for col in filter_cols:
     if df[col].dtype == object:
         unique_vals = df[col].dropna().unique().tolist()
@@ -222,56 +235,41 @@ for col in filter_cols:
         selected_range = st.slider(f"Wertebereich für '{col}' auswählen:", min_val, max_val, (min_val, max_val))
         filtered_df = filtered_df[(filtered_df[col] >= selected_range[0]) & (filtered_df[col] <= selected_range[1])]
 
-# Bearbeitbare Tabelle
 edit_df = filtered_df.copy()
 edit_df = edit_df.dropna(axis=1, how='all')
-edited_df = st.data_editor(
-    edit_df,
-    num_rows="dynamic",
-    use_container_width=True,
-    key="excel_editor"
-)
+edited_df = st.data_editor(edit_df, num_rows="dynamic", use_container_width=True, key="excel_editor")
 
 if st.button("Änderungen speichern"):
     save_company_data(edited_df)
     st.success("Änderungen gespeichert!")
 
-# 3) E-Mails senden (nur an gefilterte Unternehmen)
 st.header("3. E-Mails senden (an gefilterte Auswahl)")
 
-mail_text_option = st.radio(
-    "Welchen E-Mail-Text möchtest du verwenden?",
-    ("Standard-Text verwenden", "Eigenen Text eingeben")
-)
+mail_text_option = st.radio("Welchen E-Mail-Text möchtest du verwenden?", ("Standard-Text verwenden", "Eigenen Text eingeben"))
 if mail_text_option == "Eigenen Text eingeben":
-    custom_mail_subject = st.text_input("Eigener E-Mail-Betreff (nutze {company} als Platzhalter für den Firmennamen):", value="Maßgeschneiderte Lösungen für {company}")
-    custom_mail_text = st.text_area("Eigener E-Mail-Text (nutze {company} als Platzhalter für den Firmennamen):")
+    custom_mail_subject = st.text_input("Eigener E-Mail-Betreff (nutze {company} als Platzhalter):", value="Maßgeschneiderte Lösungen für {company}")
+    custom_mail_text = st.text_area("Eigener E-Mail-Text (nutze {company} als Platzhalter):")
 else:
     custom_mail_subject = None
     custom_mail_text = None
 
-# Auswahl für E-Mail-Signatur
 add_signature = st.checkbox("E-Mail-Signatur anhängen (empfohlen)", value=True)
-
-# Optionaler Anhang per Drag & Drop
 uploaded_file = st.file_uploader("Optional: Anhang (z.B. PDF) per Drag & Drop hinzufügen", type=["pdf"])
 
 if not filtered_df.empty:
     options = [
-        f"{row['Unternehmen']} ({row['E-Mail']})"
+        f"{row['Unternehmensname (laut Handelsregister)']} ({row['E-Mail']})"
         for idx, row in filtered_df.iterrows()
     ]
-    selected = st.multiselect(
-        "Wähle die Unternehmen aus, die du kontaktieren möchtest:",
-        options
-    )
+    selected = st.multiselect("Wähle die Unternehmen aus, die du kontaktieren möchtest:", options)
+    
     if st.button("Ausgewählten Unternehmen E-Mails senden"):
         for idx, row in filtered_df.iterrows():
-            label = f"{row['Unternehmen']} ({row['E-Mail']})"
+            label = f"{row['Unternehmensname (laut Handelsregister)']} ({row['E-Mail']})"
             if label in selected:
                 send_mail(
                     row['E-Mail'],
-                    row['Unternehmen'],
+                    row['Unternehmensname (laut Handelsregister)'],
                     mail_text=custom_mail_text if mail_text_option == "Eigenen Text eingeben" else None,
                     mail_subject=custom_mail_subject if mail_text_option == "Eigenen Text eingeben" else None,
                     attachment=uploaded_file,
