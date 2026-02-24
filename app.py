@@ -138,9 +138,18 @@ if st.button("Unternehmen suchen (normal)"):
     if prompt:
         response_text = get_companies_via_openai_prompt(prompt)
         companies = parse_openai_response(response_text)
+        
+        filtered_companies = [] # Hier speichern wir nur die, die wir behalten wollen
 
         for company in companies:
             hub_org = get_last_company_activity(company["Name"])
+            
+            # --- FIX 2: Der funktionierende HubSpot Filter ---
+            # Wenn Checkbox an ist UND Firma in HubSpot gefunden wurde -> überspringen!
+            if only_new_hubspot and hub_org is not None:
+                continue 
+            # -------------------------------------------------
+            
             company["Letzter Kontakt Organisation"] = hub_org["last_activity_date"] if hub_org else "Keinen Kontakt gefunden"
 
             if search_contacts:
@@ -153,10 +162,13 @@ if st.button("Unternehmen suchen (normal)"):
                     company["Letzter Kontakt Person"] = "Keine Kontaktperson gefunden"
             else:
                 company["Letzter Kontakt Person"] = ""
+                
+            filtered_companies.append(company)
 
-        st.session_state['companies'] = companies
+        # Nur die gefilterte Liste in die Anzeige übernehmen
+        st.session_state['companies'] = filtered_companies
 
-        companies_df = pd.DataFrame(companies)
+        companies_df = pd.DataFrame(filtered_companies)
 
         def highlight_last_contact(val):
             if val and val != "Keinen Kontakt gefunden":
@@ -171,23 +183,20 @@ if st.button("Unternehmen suchen (normal)"):
             st.write("Gefundene Unternehmen:")
             st.dataframe(styled_df, use_container_width=True)
         else:
-            st.write("Keine Unternehmen gefunden.")
+            if only_new_hubspot and len(companies) > 0:
+                st.warning("Alle von OpenAI vorgeschlagenen Unternehmen waren bereits in HubSpot und wurden herausgefiltert. Klicke erneut auf Suchen!")
+            else:
+                st.write("Keine Unternehmen gefunden.")
     else:
         st.warning("Bitte gib einen Prompt ein.")
 
 if st.session_state['companies']:
     with st.form("unternehmen_eintragen_form"):
-        gruppe = st.text_input("Gruppe (optional)")
-        region = st.text_input("Region (optional)")
-        mitglied = st.text_input("Name icons Mitglied (optional)")
         submit = st.form_submit_button("Gefundene Unternehmen in Tabelle eintragen")
         if submit:
             companies_to_add = []
             for company in st.session_state['companies']:
                 company = company.copy()
-                if gruppe: company['Gruppe'] = gruppe
-                if region: company['Region'] = region
-                if mitglied: company['Name icons Mitglied'] = mitglied
                 companies_to_add.append(company)
             skipped = update_sheet(companies_to_add)
             if skipped:

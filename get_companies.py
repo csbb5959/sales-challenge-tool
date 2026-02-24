@@ -77,10 +77,27 @@ def parse_openai_response(response_text):
     return companies
 
 def update_sheet(companies):
-    # ANGEPASST: Zieht den echten Spaltennamen für den Abgleich
-    existing_names = set(str(row.get('Unternehmensname (laut Handelsregister)', '')) for row in worksheet.get_all_records())
+    # Spalte A (Unternehmensnamen) abrufen
+    try:
+        col_a = worksheet.col_values(1)
+    except Exception:
+        col_a = []
+        
+    existing_names = set(str(name).strip() for name in col_a[5:] if str(name).strip())
+    
+    # --- FIX 1: Exakt die erste freie Zeile ab Zeile 6 finden ---
+    insert_row_idx = 6
+    for i in range(5, len(col_a)):
+        if not str(col_a[i]).strip(): # Wenn die Zelle leer ist
+            insert_row_idx = i + 1
+            break
+    else:
+        # Wenn zwischendrin keine frei ist, hänge es ganz unten an
+        insert_row_idx = max(6, len(col_a) + 1)
+        
     new_count = 0
     skipped_names = []
+    rows_to_insert = [] # Wir sammeln alle neuen Zeilen hier
     
     for company in companies:
         company_name = company.get('Name', '').strip()
@@ -97,36 +114,21 @@ def update_sheet(companies):
             skipped_names.append(company_name)
             continue
             
-        # ANGEPASST: Exaktes Mapping auf die 17 sichtbaren Spalten im Sheet.
-        # Zusatzinfos von OpenAI werden ganz ans Ende gehängt.
         new_row = [
-            company_name,         # 1: Unternehmensname (laut Handelsregister)
-            '',                   # 2: Tr
-            name,                 # 3: Name, Nachname
-            '',                   # 4: Tr
-            email,                # 5: E-Mail
-            '',                   # 6: Alternative E-Mail
-            '',                   # 7: Alternative E-Mail 2
-            '',                   # 8: Tr
-            '',                   # 9: Telefonnummer
-            '',                   # 10: Tr
-            0,                    # 11: Anzahl Mails/ LinkedIn Nachrichten
-            'FALSE',              # 12: Cold-Call?
-            'FALSE',              # 13: Persönlich?
-            'FALSE',              # 14: Get 2 Gether?
-            'FALSE',              # 15: Proposal?
-            'FALSE',              # 16: Projekt?
-            0,                    # 17: Punkte
-            # Angehängte Metadaten:
+            company_name, name, email, '', '', '', 
+            0, 'FALSE', 'FALSE', 'FALSE', 'FALSE', 'FALSE', 0,
             website, region, gruppe, mitglied, last_contact_person, letzter_kontakt_orga
         ]
         
-        worksheet.append_row(new_row)
-        new_count += 1
+        rows_to_insert.append(new_row)
         existing_names.add(company_name)
+        new_count += 1
         
-    if new_count > 0:
-        print(f"{new_count} Unternehmen hinzugefügt.")
+    # --- FIX 1b: Alle gesammelten Zeilen exakt an der Lücke einfügen ---
+    if rows_to_insert:
+        worksheet.update(range_name=f"A{insert_row_idx}", values=rows_to_insert)
+        print(f"{new_count} Unternehmen ab Zeile {insert_row_idx} hinzugefügt.")
     else:
         print("Keine neuen Unternehmen hinzugefügt.")
+        
     return skipped_names
