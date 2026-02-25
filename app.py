@@ -26,7 +26,6 @@ def check_password():
 check_password()
 
 from get_companies import get_companies_via_openai_prompt, parse_openai_response, update_sheet, get_prompt
-# ACHTUNG: df hier aus dem Import entfernt, da app.py seine eigene Tabelle lädt
 from send_emails import send_mail, td, DELAY_SECONDS, LOG_FILE
 from hubspot_api import annotate_companies_with_hubspot, get_last_company_activity, get_last_hubspot_contact
 
@@ -51,7 +50,6 @@ worksheet = sh.worksheet(WORKSHEET_NAME)
 
 @st.cache_data(ttl=60)
 def load_company_data():
-    # HIER IST DER FIX: Wir starten exakt bei Zeile 6
     data = worksheet.get("A6:Q")
     
     if not data:
@@ -89,11 +87,7 @@ def load_company_data():
     return df
 
 def save_company_data(df):
-    # WICHTIG: Wir löschen NICHT mehr das ganze Sheet, sondern nur den Tabellenbereich ab Zeile 6!
-    # "A6:Q1000" löscht großzügig nach unten, ohne deine Statistiken oben zu berühren.
     worksheet.batch_clear(["A6:Q1000"]) 
-    
-    # Die neuen Daten ab Zelle A6 einfügen
     data_to_upload = [df.columns.values.tolist()] + df.values.tolist()
     worksheet.update(range_name="A6", values=data_to_upload)
 
@@ -139,16 +133,13 @@ if st.button("Unternehmen suchen (normal)"):
         response_text = get_companies_via_openai_prompt(prompt)
         companies = parse_openai_response(response_text)
         
-        filtered_companies = [] # Hier speichern wir nur die, die wir behalten wollen
+        filtered_companies = [] 
 
         for company in companies:
             hub_org = get_last_company_activity(company["Name"])
             
-            # --- FIX 2: Der funktionierende HubSpot Filter ---
-            # Wenn Checkbox an ist UND Firma in HubSpot gefunden wurde -> überspringen!
             if only_new_hubspot and hub_org is not None:
                 continue 
-            # -------------------------------------------------
             
             company["Letzter Kontakt Organisation"] = hub_org["last_activity_date"] if hub_org else "Keinen Kontakt gefunden"
 
@@ -165,9 +156,7 @@ if st.button("Unternehmen suchen (normal)"):
                 
             filtered_companies.append(company)
 
-        # Nur die gefilterte Liste in die Anzeige übernehmen
         st.session_state['companies'] = filtered_companies
-
         companies_df = pd.DataFrame(filtered_companies)
 
         def highlight_last_contact(val):
@@ -214,10 +203,8 @@ except Exception as e:
     st.error(f"{type(e).__name__} - {e}")
     st.stop()
 
-# ANGEPASST: Nutzt nun "Unternehmensname (laut Handelsregister)"
 df = df[df["Unternehmensname (laut Handelsregister)"].notna() & (df["Unternehmensname (laut Handelsregister)"].str.strip() != "")]
 
-# ANGEPASST: Filter auf existierende Spalten geändert
 unternehmen_filter = st.text_input("Filter für 'Unternehmensname':")
 name_filter = st.text_input("Filter für 'Name, Nachname':")
 email_filter = st.text_input("Filter für 'E-Mail':")
@@ -265,6 +252,9 @@ else:
 add_signature = st.checkbox("E-Mail-Signatur anhängen (empfohlen)", value=True)
 uploaded_file = st.file_uploader("Optional: Anhang (z.B. PDF) per Drag & Drop hinzufügen", type=["pdf"])
 
+# --- NEU: Eingabefeld für die CC-E-Mail-Adresse ---
+cc_email_input = st.text_input("Optional: CC-Adresse hinzufügen (z.B. für eine Kopie an dich selbst oder das CRM):")
+
 if not filtered_df.empty:
     options = [
         f"{row['Unternehmensname (laut Handelsregister)']} ({row['E-Mail']})"
@@ -282,7 +272,8 @@ if not filtered_df.empty:
                     mail_text=custom_mail_text if mail_text_option == "Eigenen Text eingeben" else None,
                     mail_subject=custom_mail_subject if mail_text_option == "Eigenen Text eingeben" else None,
                     attachment=uploaded_file,
-                    add_signature=add_signature
+                    add_signature=add_signature,
+                    cc_email=cc_email_input if cc_email_input.strip() else None # <-- NEU übergeben
                 )
                 st.success(f"Mail gesendet an {row['E-Mail']}")
                 time.sleep(DELAY_SECONDS)

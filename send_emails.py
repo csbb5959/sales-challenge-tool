@@ -65,10 +65,10 @@ SIGNATURE_HTML = """
 <br><br>
 <span style="color:#888; font-size:13px;">
   <b style="color:#888; font-size:15px;">Lucas Freigang</b><br>
-  <span style="font-size:11px;">Head of ESG</span><br>
+  <span style="font-size:11px;">Student Consultant</span><br>
   <a href="https://icons.at" style="color:#1a73e8; text-decoration:none; font-size:14px;">icons – consulting by students Innsbruck</a><br>
   <br>
-  <span>Bürgerstraße 2 | 6020 Innsbruck | Österreich</span><br><br>
+  <span>Tiergartenstraße 35b | 6020 Innsbruck | Österreich</span><br><br>
   <span>
     +436607197960 | <a href="mailto:lucas.freigang@icons.at" style="color:#888;">lucas.freigang@icons.at</a> | <a href="https://icons.at" style="color:#888;">icons.at</a>
   </span>
@@ -91,11 +91,23 @@ def add_signature_to_html(html, signature):
     import re
     return re.sub(r"</body\s*>", signature + "</body>", html, flags=re.IGNORECASE)
 
-def send_mail(recipient, company, mail_text=None, mail_subject=None, attachment=None, add_signature=True):
+# HIER IST DER FIX: Parameter "cc_email=None" am Ende hinzugefügt
+def send_mail(recipient, company, mail_text=None, mail_subject=None, attachment=None, add_signature=True, cc_email=None):
+    if not recipient or not str(recipient).strip():
+        logging.error(f"Abgebrochen: Keine E-Mail-Adresse für '{company}' vorhanden.")
+        print(f"Abgebrochen: Keine E-Mail-Adresse für '{company}'.")
+        return
+        
     try:
         msg = MIMEMultipart()
         msg['From'] = td['GMAIL_USER']
         msg['To'] = recipient
+        
+        # --- NEU: CC hinzufügen, falls ausgefüllt ---
+        if cc_email:
+            msg['Cc'] = cc_email
+        # --------------------------------------------
+        
         subject = mail_subject.format(company=company) if mail_subject else f"Maßgeschneiderte Lösungen für {company}"
         msg['Subject'] = subject
 
@@ -119,7 +131,9 @@ def send_mail(recipient, company, mail_text=None, mail_subject=None, attachment=
         server = smtplib.SMTP(td['SMTP_HOST'], td['SMTP_PORT'])
         server.starttls()
         server.login(td['GMAIL_USER'], td['GMAIL_PASS'])
-        server.send_message(msg)
+        
+        # Senden! Python (smtplib) liest To und Cc automatisch aus dem 'msg' Header aus
+        server.send_message(msg) 
         server.quit()
 
         logging.info(f"Erfolgreich gesendet an {recipient} ({company})")
